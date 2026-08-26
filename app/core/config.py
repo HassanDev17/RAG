@@ -12,6 +12,11 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = "gemini-3.6-flash"
 
+    embedding_model: str = "models/gemini-embedding-001"
+
+    notion_api_key: str = ""
+    supabase_db_url: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

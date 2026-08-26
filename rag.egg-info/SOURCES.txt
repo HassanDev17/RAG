@@ -10,6 +10,15 @@ app/api/v1/router.py
 app/core/__init__.py
 app/core/config.py
 app/core/logging.py
+app/rag/__init__.py
+app/rag/chunking.py
+app/rag/embeddings.py
+app/rag/ingest.py
+app/rag/notion_loader.py
+app/rag/prompt.py
+app/rag/reranker.py
+app/rag/retrieval.py
+app/rag/store.py
 app/schemas/__init__.py
 app/schemas/chat.py
 app/services/__init__.py

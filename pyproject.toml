@@ -8,6 +8,11 @@ dependencies = [
     "pydantic-settings>=2.6",
     "langchain-anthropic>=0.3",
     "langchain-google-genai>=2.0",
+    "langchain-text-splitters>=0.3",
+    "notion-client>=2.2",
+    "psycopg[binary]>=3.2",
+    "pgvector>=0.3",
+    "sentence-transformers>=3.0",
 ]
 
 [project.optional-dependencies]

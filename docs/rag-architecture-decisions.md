@@ -1,6 +1,7 @@
 # RAG Architecture Decisions
 
-Status: decided, not yet implemented. Written 2026-08-26.
+Status: decided. Ingestion and retrieval implemented 2026-08-26; reranker included.
+History-aware query rewriting and multi-query expansion remain unimplemented (see Open items).
 
 ## Context
 
@@ -84,10 +85,29 @@ Leaning toward a self-hosted `bge-reranker` over Cohere Rerank's API, for the sa
 reason as the vector DB choice — avoids sending internal incident/policy text to another external
 API. Revisit if self-hosted quality or latency proves insufficient.
 
+## Implementation notes (retrieval flow, built 2026-08-26)
+
+Hybrid search is implemented as a single Postgres function, `hybrid_search()`
+(`app/rag/schema.sql`), rather than LangChain's `EnsembleRetriever` — one SQL round trip,
+RRF fusion done server-side over a vector CTE (`embedding <=> query_embedding`) and a keyword
+CTE (`content_tsv @@ websearch_to_tsquery(...)`, generated `tsvector` column + GIN index).
+`app/rag/retrieval.py` embeds the query and calls the function; `app/rag/reranker.py` reranks
+the top ~25 candidates down to 5 with a self-hosted `BAAI/bge-reranker-base` cross-encoder;
+`app/rag/prompt.py` builds the grounded prompt (cite-by-number, explicit "say you don't know"
+instruction, and a distinct instruction path when zero chunks match). Orchestrated in
+`app/services/chat.py`'s `handle_chat()`.
+
+Verified end-to-end: in-corpus questions (e.g. leave carry-over) return correctly cited,
+grounded answers; out-of-corpus questions (e.g. "capital of Mars") correctly return "I don't
+know" instead of hallucinating.
+
 ## Open items
 
 - Source connectors for policies and incidents — pick once the source systems are decided
   (Confluence/Notion/Jira/plain files); design above already isolates this to the loader layer.
 - Access control / sensitivity tiers on documents — not yet designed; matters once policies with
   restricted audiences (e.g., HR-only) enter the corpus.
-- Reranker hosting (self-hosted vs. API) — leaning self-hosted, not yet benchmarked.
+- Reranker hosting: self-hosted `bge-reranker-base` shipped as decided; not yet benchmarked
+  against Cohere Rerank for quality/latency at scale.
+- History-aware query rewriting and multi-query expansion — deferred; needs `ChatMessage` and
+  the Streamlit frontend to carry conversation history, which neither does yet (single-turn only).
