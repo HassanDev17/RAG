@@ -53,6 +53,12 @@ st.markdown(
     .chat-bubble p { margin: 0 0 0.5rem 0; }
     .chat-bubble p:last-child { margin-bottom: 0; }
 
+    .chat-meta {
+        font-size: 0.76rem;
+        color: #8a8a94;
+        margin-top: 0.35rem;
+    }
+
     div[data-testid="stChatInput"] {
         max-width: 780px;
         margin: 0 auto;
@@ -71,12 +77,26 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
 
 
-def render_message(role: str, content: str) -> None:
+def render_message(role: str, content: str, meta: dict | None = None) -> None:
     body = html.escape(content).replace("\n", "<br>") if role == "user" else content
+
+    meta_html = ""
+    if meta:
+        parts = []
+        if meta.get("total_tokens") is not None:
+            parts.append(
+                f"{meta['total_tokens']} tokens "
+                f"({meta.get('input_tokens', '?')} in / {meta.get('output_tokens', '?')} out)"
+            )
+        if meta.get("latency_ms") is not None:
+            parts.append(f"{meta['latency_ms']:.0f} ms")
+        if parts:
+            meta_html = f'<div class="chat-meta">{" · ".join(parts)}</div>'
+
     st.markdown(
         f"""
         <div class="chat-row {role}">
-            <div class="chat-bubble {role}">{body}</div>
+            <div class="chat-bubble {role}">{body}{meta_html}</div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -84,7 +104,7 @@ def render_message(role: str, content: str) -> None:
 
 
 for message in st.session_state.messages:
-    render_message(message["role"], message["content"])
+    render_message(message["role"], message["content"], message.get("meta"))
 
 prompt = st.chat_input("Ask a question...")
 
@@ -99,6 +119,7 @@ if prompt:
             unsafe_allow_html=True,
         )
 
+    meta = None
     try:
         response = requests.post(
             CHAT_ENDPOINT,
@@ -106,11 +127,19 @@ if prompt:
             timeout=60,
         )
         response.raise_for_status()
-        reply = response.json()["content"]
+        data = response.json()
+        reply = data["content"]
+        token_usage = data.get("token_usage") or {}
+        meta = {
+            "input_tokens": token_usage.get("input_tokens"),
+            "output_tokens": token_usage.get("output_tokens"),
+            "total_tokens": token_usage.get("total_tokens"),
+            "latency_ms": data.get("latency_ms"),
+        }
     except requests.RequestException as exc:
         reply = f"Sorry, something went wrong talking to the backend: {exc}"
 
     placeholder.empty()
-    render_message("assistant", reply)
+    render_message("assistant", reply, meta)
 
-    st.session_state.messages.append({"role": "assistant", "content": reply})
+    st.session_state.messages.append({"role": "assistant", "content": reply, "meta": meta})

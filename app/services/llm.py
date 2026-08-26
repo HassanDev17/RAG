@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from functools import lru_cache
 
 from langchain_anthropic import ChatAnthropic
@@ -13,6 +14,14 @@ _PROVIDERS = {
 }
 
 
+@dataclass
+class GenerationResult:
+    content: str
+    input_tokens: int | None
+    output_tokens: int | None
+    total_tokens: int | None
+
+
 @lru_cache
 def get_llm() -> BaseChatModel:
     settings = get_settings()
@@ -20,7 +29,13 @@ def get_llm() -> BaseChatModel:
     return provider_cls(model=settings.llm_model, api_key=settings.llm_api_key or None)
 
 
-def generate_reply(prompt: str) -> str:
+def generate_reply(prompt: str) -> GenerationResult:
     llm = get_llm()
     response = llm.invoke([HumanMessage(content=prompt)])
-    return response.text
+    usage = response.usage_metadata or {}
+    return GenerationResult(
+        content=response.text,
+        input_tokens=usage.get("input_tokens"),
+        output_tokens=usage.get("output_tokens"),
+        total_tokens=usage.get("total_tokens"),
+    )
